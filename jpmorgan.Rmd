@@ -19,6 +19,8 @@ library("pastecs")
 library("ggplot2")
 library("ISOweek")
 library("lubridate")
+library("car")
+
 ```
 
 ## Obtain the Data
@@ -159,14 +161,14 @@ Box.test(AR1_resid, lag = 5, type = "Ljung-Box", fitdf = 1)
 ## plot timeseries of residual^2 and fit a scatter plot smoother to highlight changes
 ##reuslt:  The volatility seems to be changing.
 par(mfrow=c(1,2));par(mar=c(3,3,3,3))
-plot(resid(fitAR1)**2, type="l", col=1, main = expression(residual^2))
-smoother = loess((resid(fitAR1)**2) ~ seq(1,length(resid(fitAR1))), span=0.1)
-lines(seq(1,length(resid(fitAR1))),fitted(smoother),col=2)
+plot(resid(AR)**2, type="l", col=1, main = expression(residual^2))
+smoother = loess((resid(AR)**2) ~ seq(1,length(resid(AR))), span=0.1)
+lines(seq(1,length(resid(AR))),fitted(smoother),col=2)
 #We also check for autocorrelation in the squared residuals by using an ACF plot of residual^2
 ##result: The squared residuals seemed to be slightly autocorrelated
-acf((resid(fitAR1)**2), main=expression("sample ACF of "~ residual^2))
+acf((resid(AR)**2), main=expression("sample ACF of "~ residual^2))
 #Ljung Box test result: no autocorrelation in the squared residuals
-Box.test(resid(fitAR1)**2, lag = 5, type = "Ljung-Box", fitdf = 1)
+Box.test(resid(AR)**2, lag = 5, type = "Ljung-Box", fitdf = 1)
 
 #(4)check normality of residual
 qqnorm(AR1_resid, datax = TRUE,
@@ -180,20 +182,20 @@ qqline(AR1_resid, datax=TRUE, col = 2)
 ## Day of the Week Effect
 
 - Test and see if the data show any seasonal effects over days of the week.
-***RT=β1 D1,t + β2 D2,t + β3 D3,t + β4 D4,t + β5 D5,t + ℇt**
+**RT=β1 D1,t + β2 D2,t + β3 D3,t + β4 D4,t + β5 D5,t + ℇt**
 
 - Note that there is no constant in the above regression; if you want to include a constant you can have only 4 dummy variables. 
 - Report and comment on findings.
 
 ```{r}
 
-ts=data$Rvec
-index=as.numeric(strftime(as.Date('index(ts)', "%d-%m-%Y"), "%u"))
-
-
+# ts = data[c("date", "Rvec")]
+# ts <- as.data.frame(ts) 
+# index = as.numeric(strftime(as.Date(ts$date, "%d-%m-%Y"), "%u"))
+ 
 # convert from calendar date to week date and back to calendar date
-weekday=wday(ymd(index(ts)))-1
-data=cbind(weekday,Rvec)
+weekday = wday(ymd(as.Date(data$date))) - 1
+data=cbind(weekday, Rvec)
 head(data)
 
 D1=rep(0,length(Rvec))
@@ -210,10 +212,15 @@ for(i in c(1:length(Rvec))){
   if (weekday[i]==5){D5[i]=1}
 }
 
+
 #Logistic regression model
 multi.fit = lm(Rvec~D1+D2+D3+D4+D5)
 summary(multi.fit)
+
 ```
+
+
+
 ```{r}
 # model assumptions
 
@@ -222,31 +229,22 @@ plot(multi.fit$residuals, pch = 16, ylab= "Residuals")
 abline(h = 0, lty = 3)
 
 #test residual homoscedasticity
-install.packages('car')
-library(car)
 ncvTest(multi.fit)
+
+
 #test residual normality
 r=multi.fit$residuals
 shapiro.test(r)
 hist(r,col="bisque", freq=FALSE, main=NA)
 qqPlot(r)
+
+
 #test if Monday return is statistically significant
 multi.fit_exceptMonday = lm(Rvec~D2+D3+D4+D5)
 anova(multi.fit_exceptMonday,multi.fit)
 
 ```
 
-```{r}
-
-
-```
-
-
-
-```{r}
-
-
-```
 
 
 
