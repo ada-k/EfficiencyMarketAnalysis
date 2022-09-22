@@ -1,18 +1,4 @@
----
-title: "JPMorgan"
-output:
-  html_document:
-    df_print: paged
-  pdf_document: default
-date: "2022-09-20"
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r}
-
+# libraries
 library("quantmod")
 library("pastecs")
 library("ggplot2")
@@ -21,122 +7,63 @@ library("lubridate")
 library("car")
 library("olsrr")
 
-```
 
-## Obtain the Data
-- Obtain daily data for 2 - 3 stocks or market indices that is related to *JP MORGAN* over a span of at least 10 to 20 years.
-- find at least one or two competitor of *JP MORGAN*. (Sources: Datastream, EIA, or Yahoo Finance.)
-- Compute the simple return as:
+# data
 
-**Rt = [(Yt - Yt-1) / Yt-1 ]*100**
-
-where **Rt** is return at time t, **Yt** is the Adjusted close price at time t and **Yt-1** is the Adjusted close price at time t-1
-
-```{r}
 getSymbols("JPM",from="2007-01-01",to="2022-9-20",src="yahoo",auto.assign=TRUE)
 head(JPM)
-```
 
-```{r}
-# compute return
+
+# Return
 
 Pvec <- as.vector(JPM$JPM.Adjusted)
 Rvec <- (Pvec[-1] / Pvec[-length(Pvec)]-1)*100
-
 # add as a column to our data set
 Rvec = c(0,Rvec)
 data = data.frame(cbind(Rvec,JPM))
-
 # create TS df
 ts = data.frame(data$Rvec)
 index = as.numeric(strftime(as.Date('index(ts)', "%d-%m-%Y"), "%u"))
-
-
 #compute the log return
 rvec<-diff(log(Pvec))
-
 head(ts)
 head(data)
-```
 
 
-## Tests of Weak Form Efficiency
-- Read about EMH to get guidance about how to interpret and comment on the results of the weak-form efficiency tests as applied to your data.
+# weak form efficiency
 
-### Descriptive Statistics and return distributions
-- Analyzing the data using:
-  - the summary statistics (e.g., mean, median, max, min, skewness, kurtosis etc.) in a Table. 
-  - Plots of time series of returns of the data.
-  - Histogram of the return distribution for your stocks and indices. 
-- Comment on the statistical and economic (if any) interpretation of your data. 
-
-```{r, echo=FALSE}
 # summary statistics
 data.frame(stat.desc(data, norm = TRUE))
-```
-
-
-```{r, echo=FALSE}
-# return vector: distribution
-
 # distribution
-
 # Overlaid histograms
 ggplot(data, aes(x=Rvec)) +
-    geom_histogram(binwidth=.5, alpha=.5, position="identity")+ ggtitle("Return Distribution Plot")
+  geom_histogram(binwidth=.5, alpha=.5, position="identity")+ ggtitle("Return Distribution Plot")
 # Density plots with semi-transparent fill
 ggplot(data, aes(x=Rvec)) + geom_density(alpha=.3, fill="red")+ ggtitle("Return Distribution Plot")
-
 ggplot(data, aes(x=Rvec
 )) + geom_boxplot() + 
-    guides(fill=FALSE) + coord_flip() + ggtitle("Return Box Plot")
+  guides(fill=FALSE) + coord_flip() + ggtitle("Return Box Plot")
+summary(data$date)
 
-
-``` 
-
-
-```{r}
 # return vector: time series
-
 # make date a col
 data <- cbind(date = rownames(data), data)
 rownames(data) <- 1:nrow(data)
 data$date <- as.POSIXct(data$date, format="%Y-%m-%d" )
 #data$date <- strptime(data$date, format = "%Y-%m-%d")
-
 p <- ggplot(data, aes(x=date, y=Rvec)) + geom_line() +  theme_minimal() + 
-       labs(x="Date", y="Return", title="Return Time Series Plot")
-p 
-
-```
-
-```{r}
-summary(data$date)
-```
+  labs(x="Date", y="Return", title="Return Time Series Plot")
+p
 
 
-## Autoregressive (AR) Model
-
-- Test to see if the return data in your sample follow a random walk using the AR (1) model:
-**Rt= σ+ β1 Rt-1 + ℇt**
-
-where the dependent variable *Rt* is the return for the time t, and the independent variable *Rt-1* is the return lagged one period for time t-1.
-
-- Create a one-period lag of return either manually in excel or you simply do that in SPSS, for instance, by using the LAG function under the Transform>Compute variables menu.
-- Report and discuss your results.
-
-
-
-```{r}
 #Fitting the AR Model to the time series
+
 AR <- arima(Rvec, order = c(1,0,0)) # first-order autoregressive model:
 print(AR)
-
 #plot the series along with the fitted values
 ts.plot(Rvec)
 AR_fit <- Rvec - residuals(AR)
 points(AR_fit, type = "l", col = 2, lty = 2)
-
 #plotting the series plus the forecast and 95% prediction intervals
 ts.plot(Rvec)
 AR_forecast <- predict(AR, n.ahead = 500)$pred
@@ -144,26 +71,23 @@ AR_forecast_se <- predict(AR, n.ahead = 500)$se
 points(AR_forecast, type = "l", col = 2)
 points(AR_forecast - 2*AR_forecast_se, type = "l", col = 2, lty = 2)
 points(AR_forecast + 2*AR_forecast_se, type = "l", col = 2, lty = 2)
-
 #test the goodness of fit
 # Find AIC of AR
 AIC(AR)
 # Find BIC of AR
 BIC(AR)
-```
 
-```{r}
+
+
 # assumptions check
 
 #(1)check if the residuals are stationary.
 ## timeseries plot of the residuals indicates stationarity
 AR1_resid = resid(AR)
 plot(AR1_resid)
-
 #(2)check if the residuals are weak WN
 acf(AR1_resid, main="Sample ACF for the residuals")
 Box.test(AR1_resid, lag = 5, type = "Ljung-Box", fitdf = 1)
-
 #(3)check if the volatility is constant
 ## plot timeseries of residual^2 and fit a scatter plot smoother to highlight changes
 ##reuslt:  The volatility seems to be changing.
@@ -176,7 +100,6 @@ lines(seq(1,length(resid(AR))),fitted(smoother),col=2)
 acf((resid(AR)**2), main=expression("sample ACF of "~ residual^2))
 #Ljung Box test result: no autocorrelation in the squared residuals
 Box.test(resid(AR)**2, lag = 5, type = "Ljung-Box", fitdf = 1)
-
 #(4)check normality of residual
 qqnorm(AR1_resid, datax = TRUE,
        xlab = "normal quantile",
@@ -184,29 +107,18 @@ qqnorm(AR1_resid, datax = TRUE,
        main = "normal probability plot for residuals")
 qqline(AR1_resid, datax=TRUE, col = 2)
 
-```
 
-## Day of the Week Effect
-
-- Test and see if the data show any seasonal effects over days of the week.
-**RT=β1 D1,t + β2 D2,t + β3 D3,t + β4 D4,t + β5 D5,t + ℇt**
-
-- Note that there is no constant in the above regression; if you want to include a constant you can have only 4 dummy variables. 
-- Report and comment on findings.
-
-```{r}
+# Day of week effect
 
 # convert from calendar date to week date and back to calendar date
 weekday = wday(ymd(as.Date(data$date))) - 1
 data=cbind(weekday, Rvec)
 head(data)
-
 D1=rep(0,length(Rvec))
 D2=rep(0,length(Rvec))
 D3=rep(0,length(Rvec))
 D4=rep(0,length(Rvec))
 D5=rep(0,length(Rvec))
-
 for(i in c(1:length(Rvec))){
   if (weekday[i]==1){D1[i]=1}
   if (weekday[i]==2){D2[i]=1}
@@ -214,58 +126,37 @@ for(i in c(1:length(Rvec))){
   if (weekday[i]==4){D4[i]=1}
   if (weekday[i]==5){D5[i]=1}
 }
-
-
-#Logistic regression model
+#linear regression model
 multi.fit = lm(Rvec~D1+D2+D3+D4+D5)
 summary(multi.fit)
 
-```
 
 
-
-```{r}
 # model assumptions
 
 #the residual plot
 plot(multi.fit$residuals, pch = 16, ylab= "Residuals")
 abline(h = 0, lty = 3)
-
 #test residual homoscedasticity
 ncvTest(multi.fit)
 plot(multi.fit)
-
 #test residual normality
 r=multi.fit$residuals
 shapiro.test(r)
 hist(r,col="bisque", freq=FALSE, main=NA)
 qqPlot(r)
-
-
 #test if Monday return is statistically significant
 multi.fit_exceptMonday = lm(Rvec~D2+D3+D4+D5)
 anova(multi.fit_exceptMonday, multi.fit)
-
 # non-zero residuals mean
 print(mean(resid(multi.fit)))
-
-
 # test for residuals autocorrelation
 durbinWatsonTest(multi.fit)
-
 # autocorrelation of predictors
 df <- data.frame(D1, D2, D3, D4, D5)
 cor(df)
 ols_vif_tol(multi.fit)
-
 # correlation and covariance between residuals and Xs
 dd <- data.frame(D1, D2, D3, D4, D5, resid(multi.fit))
 cor(dd)
 cov(dd)
-
-```
-
-
-
-
-
